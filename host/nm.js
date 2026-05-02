@@ -7,7 +7,11 @@ function readMessages(buffer) {
   while (remaining.length >= 4) {
     const len = remaining.readUInt32LE(0);
     if (remaining.length < 4 + len) break;
-    messages.push(JSON.parse(remaining.slice(4, 4 + len).toString('utf8')));
+    try {
+      messages.push(JSON.parse(remaining.slice(4, 4 + len).toString('utf8')));
+    } catch {
+      // skip malformed message body
+    }
     remaining = remaining.slice(4 + len);
   }
   return { messages, remaining };

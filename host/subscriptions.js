@@ -19,6 +19,13 @@ class SubscriptionManager {
     }
   }
 
+  removeByTabId(tabId) {
+    const prefix = `${tabId}:`;
+    for (const key of this._map.keys()) {
+      if (key.startsWith(prefix)) this._map.delete(key);
+    }
+  }
+
   getClients(tabId, event) {
     return this._map.get(`${tabId}:${event}`) || new Set();
   }

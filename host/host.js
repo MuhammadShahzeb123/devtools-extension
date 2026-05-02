@@ -11,6 +11,11 @@ let nmBuffer  = Buffer.alloc(0);
 
 const wss = new WebSocketServer({ port: 1232 });
 
+wss.on('error', (err) => {
+  process.stderr.write(`[cdp-bridge] WebSocket server error: ${err.message}\n`);
+  process.exit(1);
+});
+
 wss.on('connection', (ws) => {
   ws.on('message', (data) => {
     let msg;
@@ -43,7 +48,9 @@ process.stdin.on('data', (chunk) => {
   nmBuffer = remaining;
 
   for (const msg of messages) {
-    if (msg.type === 'event') {
+    if (msg.type === 'tabRemoved') {
+      subs.removeByTabId(msg.tabId);
+    } else if (msg.type === 'event') {
       for (const client of subs.getClients(msg.tabId, msg.event)) {
         if (client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify(msg));

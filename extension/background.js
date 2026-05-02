@@ -30,6 +30,9 @@ function connect() {
   attachAllTabs();
 }
 
+// Note: setTimeout may be cancelled if the service worker is suspended before it fires.
+// The heartbeat alarm (every 30s) acts as a fallback — it calls connect() if port is null,
+// bypassing the backoff. This is acceptable: after a long sleep, an immediate reconnect is fine.
 function scheduleReconnect() {
   const delay = backoffMs;
   backoffMs   = Math.min(backoffMs * 2, 30000);
@@ -108,7 +111,10 @@ chrome.tabs.onCreated.addListener((tab) => {
   if (tab.id) setTimeout(() => attachTab(tab.id), 500);
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => attached.delete(tabId));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  attached.delete(tabId);
+  sendToHost({ type: 'tabRemoved', tabId });
+});
 
 chrome.debugger.onDetach.addListener((source) => {
   if (source.tabId) attached.delete(source.tabId);
