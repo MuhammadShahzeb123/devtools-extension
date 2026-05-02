@@ -13,6 +13,9 @@ const wss = new WebSocketServer({ port: 1232 });
 
 wss.on('error', (err) => {
   process.stderr.write(`[cdp-bridge] WebSocket server error: ${err.message}\n`);
+  if (err.code === 'EADDRINUSE') {
+    process.stderr.write('[cdp-bridge] Port 1232 already in use. Exiting gracefully.\n');
+  }
   process.exit(1);
 });
 
