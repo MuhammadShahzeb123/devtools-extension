@@ -78,7 +78,7 @@ for (const size of [16, 48, 128]) {
 // ── 3. Update manifest path ───────────────────────────────────────────────────
 console.log('[3/4] Updating native host manifest path...');
 const manifest   = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-manifest.path    = batPath;
+manifest.path    = batPath.replace(/\\/g, '/');
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
 // ── 4. Write Windows registry key ────────────────────────────────────────────

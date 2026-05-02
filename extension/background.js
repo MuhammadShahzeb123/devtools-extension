@@ -11,9 +11,10 @@ const attached = new Set(); // tabIds with chrome.debugger attached
 // ── Native Messaging connection ───────────────────────────────────────────────
 
 function connect() {
+  if (port) return; // Already connected
   try {
     port = chrome.runtime.connectNative(HOST_NAME);
-  } catch (_) {
+  } catch (e) {
     scheduleReconnect();
     return;
   }
@@ -21,9 +22,9 @@ function connect() {
   port.onMessage.addListener(onHostMessage);
 
   port.onDisconnect.addListener(() => {
+    const error = chrome.runtime.lastError;
     port = null;
-    void chrome.runtime.lastError; // consume to suppress console error
-    scheduleReconnect();
+    if (error) scheduleReconnect();
   });
 
   backoffMs = 1000;

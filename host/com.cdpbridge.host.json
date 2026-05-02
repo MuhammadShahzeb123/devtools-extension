@@ -1,7 +1,7 @@
 {
   "name": "com.cdpbridge.host",
   "description": "CDP Bridge Native Messaging Host",
-  "path": "REPLACE_WITH_PATH_BY_INSTALL",
+  "path": "E:/Code/devtools-extension/host/run-host.bat",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://fihbmloijjdenpafmffdeikjbldjimdh/"
