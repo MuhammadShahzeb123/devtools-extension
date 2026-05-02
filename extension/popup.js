@@ -12,6 +12,6 @@ chrome.runtime.sendMessage({ type: 'status' }, (response) => {
   }
 
   dot.className     = `dot ${response.connected ? 'on' : 'off'}`;
-  label.textContent = response.connected ? 'Connected · ws://localhost:1232' : 'Disconnected';
+  label.textContent = response.connected ? 'Connected · http://localhost:1232' : 'Disconnected';
   sub.textContent   = `${response.attachedCount} tab${response.attachedCount !== 1 ? 's' : ''} attached`;
 });

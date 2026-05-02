@@ -1,13 +1,11 @@
 {
   "name": "cdp-bridge-host",
   "version": "1.0.0",
-  "description": "Native Messaging host + WebSocket bridge",
+  "description": "Native Messaging host + HTTP bridge",
   "main": "host.js",
   "scripts": {
-    "test": "node --test test/nm.test.js test/subscriptions.test.js",
+    "test": "node --test test/nm.test.js",
     "start": "node host.js"
   },
-  "dependencies": {
-    "ws": "^8.18.0"
-  }
+  "dependencies": {}
 }

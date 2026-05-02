@@ -14,7 +14,8 @@ const batPath      = path.join(hostDir, 'run-host.bat');
 const extDir       = path.join(root, 'extension');
 
 // ── 1. npm install ────────────────────────────────────────────────────────────
-console.log('[1/4] Installing npm dependencies...');
+
+console.log('[1/4] Installing host npm dependencies...');
 execSync('npm install', { cwd: hostDir, stdio: 'inherit' });
 
 // ── 2. Generate PNG icons ─────────────────────────────────────────────────────
@@ -103,7 +104,19 @@ NEXT STEPS:
   6. Click the reload icon (↺) on the extension card
 
   The bridge starts automatically when the extension loads.
-  AI clients connect to:  ws://localhost:1232
+  HTTP API available at:  http://localhost:1232
+
+  ENDPOINTS:
+    GET  /health           Liveness check
+    GET  /tabs             List open tabs
+    POST /command          Execute a CDP command
+                           Body: { "tabId": N, "method": "...", "params": {} }
+
+  USAGE (from Claude Code or any HTTP client):
+    curl http://localhost:1232/tabs
+    curl -X POST http://localhost:1232/command \\
+      -H "Content-Type: application/json" \\
+      -d '{"tabId":N,"method":"Runtime.evaluate","params":{"expression":"document.title"}}'
 
 ================================================================
 `);

@@ -50,7 +50,6 @@ async function onHostMessage(msg) {
   if (!msg || !msg.type) return;
   try {
     if (msg.type === 'command') await handleCommand(msg);
-    else if (msg.type === 'subscribe') handleSubscribe(msg);
     else if (msg.type === 'tabs') await handleTabs(msg);
   } catch (err) {
     sendToHost({ id: msg.id, type: 'error', error: err.message });
@@ -67,14 +66,6 @@ async function handleCommand({ id, tabId, method, params }) {
   } catch (err) {
     sendToHost({ id, type: 'error', error: err.message });
   }
-}
-
-function handleSubscribe({ id, tabId }) {
-  // Subscription tracking is done in the host. Extension just confirms the tab exists.
-  if (!attached.has(tabId)) {
-    return sendToHost({ id, type: 'error', error: 'Tab not attached' });
-  }
-  sendToHost({ id, type: 'result', result: {} });
 }
 
 async function handleTabs({ id }) {
@@ -117,18 +108,10 @@ chrome.tabs.onCreated.addListener((tab) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   attached.delete(tabId);
-  sendToHost({ type: 'tabRemoved', tabId });
 });
 
 chrome.debugger.onDetach.addListener((source) => {
   if (source.tabId) attached.delete(source.tabId);
-});
-
-// Forward ALL CDP events to host; host filters by client subscriptions
-chrome.debugger.onEvent.addListener((source, method, params) => {
-  if (source.tabId) {
-    sendToHost({ type: 'event', tabId: source.tabId, event: method, params });
-  }
 });
 
 // ── Heartbeat: keep service worker alive and reconnect if needed ──────────────

@@ -2,3 +2,9 @@ host/node_modules/
 host/host.log
 node_modules/
 package-lock.json
+host/package-lock.json
+*.log
+*.png
+*.jpg
+*.jpeg
+.mcp.json
