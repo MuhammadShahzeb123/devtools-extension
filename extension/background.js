@@ -46,9 +46,14 @@ function sendToHost(msg) {
 // ── Handle messages from host ─────────────────────────────────────────────────
 
 async function onHostMessage(msg) {
-  if      (msg.type === 'command')   await handleCommand(msg);
-  else if (msg.type === 'subscribe')       handleSubscribe(msg);
-  else if (msg.type === 'tabs')      await handleTabs(msg);
+  if (!msg || !msg.type) return;
+  try {
+    if (msg.type === 'command') await handleCommand(msg);
+    else if (msg.type === 'subscribe') handleSubscribe(msg);
+    else if (msg.type === 'tabs') await handleTabs(msg);
+  } catch (err) {
+    sendToHost({ id: msg.id, type: 'error', error: err.message });
+  }
 }
 
 async function handleCommand({ id, tabId, method, params }) {
@@ -76,7 +81,7 @@ async function handleTabs({ id }) {
   sendToHost({
     id,
     type: 'result',
-    result: tabs.map(t => ({
+    result: tabs.filter(t => t.id && t.url).map(t => ({
       tabId:    t.id,
       url:      t.url,
       title:    t.title,
@@ -88,16 +93,14 @@ async function handleTabs({ id }) {
 // ── Debugger management ───────────────────────────────────────────────────────
 
 async function attachTab(tabId) {
-  if (attached.has(tabId)) return;
+  if (!tabId || attached.has(tabId)) return;
   try {
     await chrome.debugger.attach({ tabId }, DEBUGGER_VERSION);
     attached.add(tabId);
   } catch (err) {
     if (err.message && err.message.includes('already attached')) {
-      // Debugger survived a service worker restart — reclaim the session
       attached.add(tabId);
     }
-    // Otherwise: chrome://, extension pages, PDFs — silently skip
   }
 }
 

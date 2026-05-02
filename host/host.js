@@ -26,8 +26,7 @@ wss.on('connection', (ws) => {
       process.stdout.write(writeMessage(msg));
     } else if (msg.type === 'subscribe') {
       subs.add(msg.tabId, msg.event, ws);
-      pending.set(msg.id, ws);
-      process.stdout.write(writeMessage(msg));
+      process.stdout.write(writeMessage({ id: msg.id, type: 'result', result: {} }));
     }
   });
 
