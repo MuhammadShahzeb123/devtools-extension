@@ -1,20 +1,27 @@
 // extension/background.js
 'use strict';
 
-const HOST_NAME       = 'com.cdpbridge.host';
+const HOST_NAME        = 'com.cdpbridge.host';
 const DEBUGGER_VERSION = '1.3';
 
 let port      = null;
 let backoffMs = 1000;
-const attached = new Set(); // tabIds with chrome.debugger attached
+let paused    = false;
+const attached = new Set();
+
+// Load persisted paused state on startup, then connect if not paused
+chrome.storage.local.get('paused', ({ paused: saved }) => {
+  paused = !!saved;
+  if (!paused) connect();
+});
 
 // ── Native Messaging connection ───────────────────────────────────────────────
 
 function connect() {
-  if (port) return; // Already connected
+  if (paused || port) return;
   try {
     port = chrome.runtime.connectNative(HOST_NAME);
-  } catch (e) {
+  } catch (_) {
     scheduleReconnect();
     return;
   }
@@ -22,19 +29,26 @@ function connect() {
   port.onMessage.addListener(onHostMessage);
 
   port.onDisconnect.addListener(() => {
-    const error = chrome.runtime.lastError;
     port = null;
-    if (error) scheduleReconnect();
+    void chrome.runtime.lastError;
+    scheduleReconnect();
   });
 
   backoffMs = 1000;
   attachAllTabs();
 }
 
+function disconnect() {
+  if (port) {
+    try { port.disconnect(); } catch (_) {}
+    port = null;
+  }
+}
+
 // Note: setTimeout may be cancelled if the service worker is suspended before it fires.
-// The heartbeat alarm (every 30s) acts as a fallback — it calls connect() if port is null,
-// bypassing the backoff. This is acceptable: after a long sleep, an immediate reconnect is fine.
+// The heartbeat alarm acts as a fallback — if paused is false and port is null, it reconnects.
 function scheduleReconnect() {
+  if (paused) return;
   const delay = backoffMs;
   backoffMs   = Math.min(backoffMs * 2, 30000);
   setTimeout(connect, delay);
@@ -49,10 +63,11 @@ function sendToHost(msg) {
 async function onHostMessage(msg) {
   if (!msg || !msg.type) return;
   try {
-    if (msg.type === 'command') await handleCommand(msg);
-    else if (msg.type === 'tabs') await handleTabs(msg);
+    if      (msg.type === 'command')   await handleCommand(msg);
+    else if (msg.type === 'subscribe')       handleSubscribe(msg);
+    else if (msg.type === 'tabs')      await handleTabs(msg);
   } catch (err) {
-    sendToHost({ id: msg.id, type: 'error', error: err.message });
+    if (msg.id) sendToHost({ id: msg.id, type: 'error', error: err.message });
   }
 }
 
@@ -66,6 +81,13 @@ async function handleCommand({ id, tabId, method, params }) {
   } catch (err) {
     sendToHost({ id, type: 'error', error: err.message });
   }
+}
+
+function handleSubscribe({ id, tabId }) {
+  if (!attached.has(tabId)) {
+    return sendToHost({ id, type: 'error', error: 'Tab not attached' });
+  }
+  sendToHost({ id, type: 'result', result: {} });
 }
 
 async function handleTabs({ id }) {
@@ -101,33 +123,49 @@ async function attachAllTabs() {
   await Promise.all(tabs.filter(t => t.id).map(t => attachTab(t.id)));
 }
 
-// New tab: wait 500 ms for it to initialize before attaching
 chrome.tabs.onCreated.addListener((tab) => {
   if (tab.id) setTimeout(() => attachTab(tab.id), 500);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   attached.delete(tabId);
+  sendToHost({ type: 'tabRemoved', tabId });
 });
 
 chrome.debugger.onDetach.addListener((source) => {
   if (source.tabId) attached.delete(source.tabId);
 });
 
-// ── Heartbeat: keep service worker alive and reconnect if needed ──────────────
-
-chrome.alarms.create('heartbeat', { periodInMinutes: 0.5 });
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'heartbeat' && !port) connect();
-});
-
-// ── Popup status query ────────────────────────────────────────────────────────
-
-chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
-  if (msg.type === 'status') {
-    reply({ connected: !!port, attachedCount: attached.size });
-    return true; // keep channel open for async reply
+chrome.debugger.onEvent.addListener((source, method, params) => {
+  if (source.tabId) {
+    sendToHost({ type: 'event', tabId: source.tabId, event: method, params });
   }
 });
 
-connect();
+// ── Heartbeat ─────────────────────────────────────────────────────────────────
+
+chrome.alarms.create('heartbeat', { periodInMinutes: 0.5 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'heartbeat' && !paused && !port) connect();
+});
+
+// ── Messages from popup ───────────────────────────────────────────────────────
+
+chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+  if (msg.type === 'status') {
+    reply({ connected: !!port, attachedCount: attached.size, paused });
+    return true;
+  }
+  if (msg.type === 'setPaused') {
+    paused = msg.value;
+    chrome.storage.local.set({ paused });
+    if (paused) {
+      disconnect();
+    } else {
+      backoffMs = 1000;
+      connect();
+    }
+    reply({ paused });
+    return true;
+  }
+});
