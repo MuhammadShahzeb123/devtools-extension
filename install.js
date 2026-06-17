@@ -78,14 +78,52 @@ for (const size of [16, 48, 128]) {
 
 // ── 3. Update manifest path ───────────────────────────────────────────────────
 console.log('[3/4] Updating native host manifest path...');
-const manifest   = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-manifest.path    = batPath.replace(/\\/g, '/');
+const isWindows = process.platform === 'win32';
+const manifest  = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+if (isWindows) {
+  manifest.path = batPath.replace(/\\/g, '/');
+} else {
+  // On Linux/macOS, create a shell launcher script
+  const shPath = path.join(hostDir, 'run-host.sh');
+  fs.writeFileSync(shPath, `#!/bin/sh\nexec node "$(dirname "$0")/host.js" 2>>"$(dirname "$0")/host.log"\n`);
+  fs.chmodSync(shPath, 0o755);
+  manifest.path = shPath;
+}
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-// ── 4. Write Windows registry key ────────────────────────────────────────────
-console.log('[4/4] Writing registry key...');
-const regKey = 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.cdpbridge.host';
-execSync(`reg add "${regKey}" /ve /t REG_SZ /d "${manifestPath}" /f`, { stdio: 'inherit' });
+// ── 4. Register native messaging host ────────────────────────────────────────
+console.log('[4/4] Registering native messaging host...');
+
+if (isWindows) {
+  const regKey = 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.cdpbridge.host';
+  execSync(`reg add "${regKey}" /ve /t REG_SZ /d "${manifestPath}" /f`, { stdio: 'inherit' });
+} else {
+  // On Linux/macOS, symlink the manifest into the Chrome NativeMessagingHosts dir
+  const home = require('os').homedir();
+  const nmDirs = [];
+  if (process.platform === 'darwin') {
+    nmDirs.push(path.join(home, 'Library', 'Application Support', 'Google', 'Chrome', 'NativeMessagingHosts'));
+    nmDirs.push(path.join(home, 'Library', 'Application Support', 'Chromium', 'NativeMessagingHosts'));
+  } else {
+    nmDirs.push(path.join(home, '.config', 'google-chrome', 'NativeMessagingHosts'));
+    nmDirs.push(path.join(home, '.config', 'chromium', 'NativeMessagingHosts'));
+  }
+  let installed = false;
+  for (const dir of nmDirs) {
+    // Only install into dirs whose parent browser config exists
+    if (!fs.existsSync(path.dirname(dir))) continue;
+    fs.mkdirSync(dir, { recursive: true });
+    const dest = path.join(dir, 'com.cdpbridge.host.json');
+    try { fs.unlinkSync(dest); } catch (_) {}
+    fs.symlinkSync(manifestPath, dest);
+    console.log(`  → Symlinked manifest into ${dir}`);
+    installed = true;
+  }
+  if (!installed) {
+    console.warn('  ⚠ No Chrome/Chromium config directory found. You may need to manually copy the manifest.');
+  }
+}
 
 console.log(`
 ================================================================
