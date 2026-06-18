@@ -1,6 +1,10 @@
 // extension/background.js
 'use strict';
 
+// High-level command palette (defines self.Palette). Loaded synchronously so it
+// is ready before any host message arrives.
+importScripts('palette.js');
+
 const HOST_NAME        = 'com.cdpbridge.host';
 const DEBUGGER_VERSION = '1.3';
 
@@ -64,6 +68,8 @@ async function onHostMessage(msg) {
   if (!msg || !msg.type) return;
   try {
     if      (msg.type === 'command')   await handleCommand(msg);
+    else if (msg.type === 'action')    await handleAction(msg);
+    else if (msg.type === 'palette')         handlePalette(msg);
     else if (msg.type === 'subscribe')       handleSubscribe(msg);
     else if (msg.type === 'tabs')      await handleTabs(msg);
   } catch (err) {
@@ -81,6 +87,24 @@ async function handleCommand({ id, tabId, method, params }) {
   } catch (err) {
     sendToHost({ id, type: 'error', error: err.message });
   }
+}
+
+// High-level command palette: one named action = one atomic call.
+async function handleAction({ id, tabId, action, args }) {
+  if (!attached.has(tabId)) {
+    return sendToHost({ id, type: 'error', error: 'Tab not attached' });
+  }
+  try {
+    const result = await self.Palette.execute(tabId, action, args || {});
+    sendToHost({ id, type: 'result', result: result || {} });
+  } catch (err) {
+    sendToHost({ id, type: 'error', error: err.message });
+  }
+}
+
+// Self-describing command catalog (no tab required).
+function handlePalette({ id }) {
+  sendToHost({ id, type: 'result', result: { actions: self.Palette.catalog() } });
 }
 
 function handleSubscribe({ id, tabId }) {

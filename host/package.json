@@ -4,7 +4,7 @@
   "description": "Native Messaging host + HTTP bridge",
   "main": "host.js",
   "scripts": {
-    "test": "node --test test/nm.test.js",
+    "test": "node --test",
     "start": "node host.js"
   },
   "dependencies": {}

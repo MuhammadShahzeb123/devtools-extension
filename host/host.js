@@ -8,7 +8,7 @@ let msgId    = 0;
 const pending = new Map(); // id -> { resolve, reject, timer }
 let nmBuffer  = Buffer.alloc(0);
 
-const PORT       = 1232;
+const PORT       = Number(process.env.CDP_BRIDGE_PORT) || 1232;
 const TIMEOUT_MS = 30000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -75,6 +75,38 @@ const server = http.createServer(async (req, res) => {
       reply(res, 200, { result });
     } catch (err) {
       reply(res, 503, { error: err.message });
+    }
+    return;
+  }
+
+  // Self-describing command catalog — fetch once, no trial-and-error.
+  if (method === 'GET' && url === '/palette') {
+    try {
+      const result = await sendCommand({ type: 'palette' });
+      reply(res, 200, result); // { actions: [...] }
+    } catch (err) {
+      reply(res, 503, { error: err.message });
+    }
+    return;
+  }
+
+  // High-level palette action: { tabId, action, args }.
+  if (method === 'POST' && url === '/action') {
+    let body;
+    try { body = await readBody(req); }
+    catch { reply(res, 400, { error: 'Invalid JSON body' }); return; }
+
+    const { tabId, action, args } = body;
+    if (typeof tabId !== 'number' || typeof action !== 'string' || !action) {
+      reply(res, 400, { error: 'Body must include numeric tabId and action string' });
+      return;
+    }
+
+    try {
+      const result = await sendCommand({ type: 'action', tabId, action, args: args || {} });
+      reply(res, 200, { result });
+    } catch (err) {
+      reply(res, 500, { error: err.message });
     }
     return;
   }
