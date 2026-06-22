@@ -2,10 +2,9 @@
 
 A Chrome extension that exposes a local **HTTP API on `http://localhost:1232`** so AI agents (Claude Code, OpenCode, curl, scripts) can directly control any Chrome tab via the Chrome DevTools Protocol (CDP).
 
-> **AI agents — start here:** use the **[Command Palette](PALETTE.md)**. It gives you high-level,
-> named actions (`click`, `read_text`, `find`, `scroll`, `screenshot`, a visual cursor, …) that are
-> **discoverable at runtime** via `GET /palette` — so you never reverse-engineer CDP by trial and
-> error. The raw `POST /command` documented below remains as a low-level escape hatch.
+> **Using OpenCode?** See **[OPENCODE.md](OPENCODE.md)** — native MCP integration, zero shell escaping, tools load automatically.
+>
+> **Other AI agents:** use the **[Command Palette](PALETTE.md)**. High-level named actions (`click`, `read_text`, `find`, `scroll`, `screenshot`, …) discoverable at runtime via `GET /palette`. The raw `POST /command` is a low-level escape hatch.
 
 ---
 
@@ -49,11 +48,13 @@ This installs host npm dependencies, generates icons, writes the native host man
 4. Copy the **Extension ID** shown under the extension card
 
 ### 4. Authorize the extension as a Native Messaging client
-Edit `host/com.cdpbridge.host.json` — replace the existing ID in `allowed_origins` with your Extension ID:
-```json
-{
-  "allowed_origins": ["chrome-extension://YOUR_EXTENSION_ID_HERE/"]
-}
+Pass your Extension ID to the installer:
+```
+node install.js --id YOUR_EXTENSION_ID_HERE
+```
+Or set it via environment variable:
+```
+set CDP_BRIDGE_EXT_ID=YOUR_EXTENSION_ID_HERE && node install.js
 ```
 Then click the **reload icon (↺)** on the extension card in `chrome://extensions`.
 

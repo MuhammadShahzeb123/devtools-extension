@@ -1,5 +1,5 @@
 @echo off
-node "%~dp0install.js"
+node "%~dp0install.js" %*
 if %ERRORLEVEL% neq 0 (
   echo.
   echo ERROR: Installation failed.

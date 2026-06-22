@@ -5,6 +5,7 @@ const fs    = require('fs');
 const path  = require('path');
 const zlib  = require('zlib');
 const { execSync } = require('child_process');
+const readline = require('readline');
 
 const root         = __dirname;
 const hostDir      = path.join(root, 'host');
@@ -13,13 +14,52 @@ const manifestPath = path.join(hostDir, 'com.cdpbridge.host.json');
 const batPath      = path.join(hostDir, 'run-host.bat');
 const extDir       = path.join(root, 'extension');
 
+// ── Parse CLI args ────────────────────────────────────────────────────────────
+
+function getExtensionId() {
+  // 1. --id <value> CLI flag
+  const idIdx = process.argv.indexOf('--id');
+  if (idIdx !== -1 && process.argv[idIdx + 1]) return process.argv[idIdx + 1];
+
+  // 2. CDP_BRIDGE_EXT_ID environment variable
+  if (process.env.CDP_BRIDGE_EXT_ID) return process.env.CDP_BRIDGE_EXT_ID;
+
+  return null;
+}
+
+function promptExtensionId() {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.question('Enter your Chrome Extension ID (from chrome://extensions): ', (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
 // ── 1. npm install ────────────────────────────────────────────────────────────
 
-console.log('[1/4] Installing host npm dependencies...');
+console.log('[1/5] Installing host npm dependencies...');
 execSync('npm install', { cwd: hostDir, stdio: 'inherit' });
 
-// ── 2. Generate PNG icons ─────────────────────────────────────────────────────
-console.log('[2/4] Generating icons...');
+// ── 2. Extension ID ───────────────────────────────────────────────────────────
+console.log('[2/5] Configuring extension ID...');
+
+async function main() {
+let extId = getExtensionId();
+if (!extId) {
+  extId = await promptExtensionId();
+}
+if (!extId) {
+  console.error('  ✗ No extension ID provided. You can set it later by editing:');
+  console.error(`    ${manifestPath}`);
+  console.error('  or re-running: node install.js --id <your-extension-id>');
+  process.exit(1);
+}
+console.log(`  → Extension ID: ${extId}`);
+
+// ── 3. Generate PNG icons ─────────────────────────────────────────────────────
+console.log('[3/5] Generating icons...');
 
 function crc32(buf) {
   const table = new Uint32Array(256);
@@ -76,8 +116,8 @@ for (const size of [16, 48, 128]) {
   );
 }
 
-// ── 3. Update manifest path ───────────────────────────────────────────────────
-console.log('[3/4] Updating native host manifest path...');
+// ── 4. Update manifest path + allowed_origins ─────────────────────────────────
+console.log('[4/5] Updating native host manifest...');
 const isWindows = process.platform === 'win32';
 const manifest  = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
@@ -90,10 +130,12 @@ if (isWindows) {
   fs.chmodSync(shPath, 0o755);
   manifest.path = shPath;
 }
+
+manifest.allowed_origins = [`chrome-extension://${extId}/`];
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-// ── 4. Register native messaging host ────────────────────────────────────────
-console.log('[4/4] Registering native messaging host...');
+// ── 5. Register native messaging host ────────────────────────────────────────
+console.log('[5/5] Registering native messaging host...');
 
 if (isWindows) {
   const regKey = 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.cdpbridge.host';
@@ -126,9 +168,9 @@ if (isWindows) {
 }
 
 console.log(`
-================================================================
+================================================
  CDP Bridge — Installation Complete
-================================================================
+================================================
 
 NEXT STEPS:
 
@@ -136,10 +178,7 @@ NEXT STEPS:
   2. Enable "Developer mode" (top-right toggle)
   3. Click "Load unpacked" and select:
        ${extDir}
-  4. Copy the Extension ID shown under the extension name
-  5. Edit:  ${manifestPath}
-     Replace  REPLACE_WITH_EXTENSION_ID  with your Extension ID
-  6. Click the reload icon (↺) on the extension card
+  4. Click the reload icon (↺) on the extension card
 
   The bridge starts automatically when the extension loads.
   HTTP API available at:  http://localhost:1232
@@ -156,5 +195,9 @@ NEXT STEPS:
       -H "Content-Type: application/json" \\
       -d '{"tabId":N,"method":"Runtime.evaluate","params":{"expression":"document.title"}}'
 
-================================================================
+================================================
 `);
+
+} // end main
+
+main();
