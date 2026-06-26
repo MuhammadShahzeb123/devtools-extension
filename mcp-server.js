@@ -270,6 +270,24 @@ const TOOLS = [
 
 // ── Tool execution ────────────────────────────────────────────────────────────
 
+// Keep tool results small — every result lands in conversation history and is a
+// cache miss. Large payloads (HTML, full-page text, long find lists) accumulate
+// fast and waste tokens on every subsequent LLM call.
+const LIMITS = {
+  default:      8_000,
+  browser_get_html:       5_000,  // raw HTML is extremely dense
+  browser_read_text:      8_000,
+  browser_find:          10_000,
+  browser_list_interactive: 6_000,
+  browser_eval:           6_000,
+};
+
+function truncate(name, text) {
+  const limit = LIMITS[name] ?? LIMITS.default;
+  if (typeof text !== 'string' || text.length <= limit) return text;
+  return text.slice(0, limit) + `\n\n[truncated — ${text.length - limit} chars omitted. Use a narrower selector or paginate.]`;
+}
+
 async function callTool(name, args) {
   const { tabId, ...rest } = args || {};
 
@@ -292,7 +310,7 @@ async function callTool(name, args) {
 
     case 'browser_read_text': {
       const r = await action(tabId, 'read_text', { selector: rest.selector, xpath: rest.xpath });
-      return { text: r.text || '(page is empty)' };
+      return { text: truncate(name, r.text || '(page is empty)') };
     }
 
     case 'browser_find': {
@@ -306,7 +324,7 @@ async function callTool(name, args) {
       const lines = r.matches.map((m) =>
         `[${m.visible ? 'visible' : 'hidden'}] <${m.tag}> "${m.text}"\n  selector: ${m.selector}\n  xpath:    ${m.xpath}\n  box: x=${m.box.x} y=${m.box.y} w=${m.box.w} h=${m.box.h}`
       );
-      return { text: `Found ${r.count} element(s):\n\n${lines.join('\n\n')}` };
+      return { text: truncate(name, `Found ${r.count} element(s):\n\n${lines.join('\n\n')}`) };
     }
 
     case 'browser_click': {
@@ -361,12 +379,13 @@ async function callTool(name, args) {
         params: { expression: rest.expression, returnByValue: true },
       });
       const val = r.result?.result?.value;
-      return { text: val !== undefined ? String(val) : JSON.stringify(r.result, null, 2) };
+      const raw = val !== undefined ? String(val) : JSON.stringify(r.result, null, 2);
+      return { text: truncate(name, raw) };
     }
 
     case 'browser_get_html': {
       const r = await action(tabId, 'get_html', { selector: rest.selector });
-      return { text: r.html };
+      return { text: truncate(name, r.html) };
     }
 
     case 'browser_list_interactive': {
@@ -375,7 +394,7 @@ async function callTool(name, args) {
       const lines = r.elements.map(
         (e) => `<${e.tag}${e.type ? ` type="${e.type}"` : ''}> "${e.text}"\n  selector: ${e.selector}`
       );
-      return { text: `${r.elements.length} interactive element(s):\n\n${lines.join('\n\n')}` };
+      return { text: truncate(name, `${r.elements.length} interactive element(s):\n\n${lines.join('\n\n')}`) };
     }
 
     case 'browser_set_value': {
@@ -385,7 +404,7 @@ async function callTool(name, args) {
 
     case 'browser_action': {
       const r = await action(tabId, rest.action, rest.args);
-      return { text: JSON.stringify(r, null, 2) };
+      return { text: truncate(name, JSON.stringify(r, null, 2)) };
     }
 
     default:
