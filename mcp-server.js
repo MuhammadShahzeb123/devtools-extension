@@ -47,6 +47,11 @@ async function action(tabId, name, args) {
   return r.result;
 }
 
+async function network(tabId, args) {
+  const r = await bridgePost('/network', { tabId, ...(args || {}) });
+  return r.result;
+}
+
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
 const TOOLS = [
@@ -222,6 +227,35 @@ const TOOLS = [
     },
   },
   {
+    name: 'browser_network',
+    description:
+      'Read the recent network trace for a tab. Use this to discover XHR/fetch APIs, request URLs, ' +
+      'status codes, initiator JavaScript stack hints, and captured response bodies that populate the frontend.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tabId:         { type: 'number', description: 'Tab ID from browser_tabs.' },
+        limit:         { type: 'number', description: 'Max recent requests to return (default 50, max 300).' },
+        onlyApi:       { type: 'boolean', description: 'Only XHR/fetch requests (default false).' },
+        type:          { type: 'string', description: 'CDP resource type filter, e.g. XHR, Fetch, Script, Document.' },
+        urlIncludes:   { type: 'string', description: 'Only requests whose URL contains this substring.' },
+        includeBodies: { type: 'boolean', description: 'Include captured response body snippets (default true).' },
+      },
+      required: ['tabId'],
+    },
+  },
+  {
+    name: 'browser_network_clear',
+    description: 'Clear the recorded network trace for a tab before a fresh navigation or interaction.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tabId: { type: 'number', description: 'Tab ID from browser_tabs.' },
+      },
+      required: ['tabId'],
+    },
+  },
+  {
     name: 'browser_list_interactive',
     description:
       'List all visible interactive elements on the page (links, buttons, inputs). ' +
@@ -280,6 +314,7 @@ const LIMITS = {
   browser_find:          10_000,
   browser_list_interactive: 6_000,
   browser_eval:           6_000,
+  browser_network:       12_000,
 };
 
 function truncate(name, text) {
@@ -388,6 +423,26 @@ async function callTool(name, args) {
       return { text: truncate(name, r.html) };
     }
 
+    case 'browser_network': {
+      const r = await network(tabId, {
+        limit: rest.limit,
+        onlyApi: rest.onlyApi,
+        type: rest.type,
+        urlIncludes: rest.urlIncludes,
+        includeBodies: rest.includeBodies,
+      });
+      if (!r.entries || !r.entries.length) {
+        return { text: 'No network requests recorded. Navigate or interact with the page, then call this again.' };
+      }
+      const lines = r.entries.map(formatNetworkEntry);
+      return { text: truncate(name, `Showing ${r.count} of ${r.total} recorded request(s):\n\n${lines.join('\n\n')}`) };
+    }
+
+    case 'browser_network_clear': {
+      await bridgePost('/network/clear', { tabId });
+      return { text: 'Network trace cleared.' };
+    }
+
     case 'browser_list_interactive': {
       const r = await action(tabId, 'list_interactive', { limit: rest.limit });
       if (!r.elements || !r.elements.length) return { text: 'No interactive elements found.' };
@@ -410,6 +465,42 @@ async function callTool(name, args) {
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
+}
+
+function formatNetworkEntry(e) {
+  const url = e.url || e.responseUrl || '(unknown url)';
+  const status = e.failed ? `FAILED ${e.errorText || ''}`.trim() : (e.status != null ? `${e.status} ${e.statusText || ''}`.trim() : 'pending');
+  const bits = [
+    `${e.method || 'GET'} ${url}`,
+    `  status: ${status}`,
+    `  type: ${e.type || 'unknown'}${e.mimeType ? `, mime: ${e.mimeType}` : ''}${e.durationMs != null ? `, ${e.durationMs}ms` : ''}`,
+  ];
+  if (e.initiator) {
+    bits.push(`  initiator: ${formatInitiator(e.initiator)}`);
+  }
+  if (e.postData) {
+    bits.push(`  request body: ${shorten(e.postData, 800)}`);
+  }
+  if (e.body) {
+    const body = e.bodyBase64Encoded ? '[base64 response body captured]' : shorten(e.body, 1600);
+    bits.push(`  response body${e.bodyTruncated ? ' (truncated)' : ''}: ${body}`);
+  } else if (e.bodyError) {
+    bits.push(`  response body: unavailable (${e.bodyError})`);
+  }
+  return bits.join('\n');
+}
+
+function formatInitiator(i) {
+  if (i.stack && i.stack.length) {
+    const frame = i.stack.find((f) => f.url) || i.stack[0];
+    return `${i.type || 'script'} ${frame.functionName || '(anonymous)'} ${frame.url || ''}:${frame.lineNumber ?? ''}`;
+  }
+  return `${i.type || 'unknown'}${i.url ? ` ${i.url}:${i.lineNumber ?? ''}` : ''}`;
+}
+
+function shorten(text, limit) {
+  const s = String(text).replace(/\s+/g, ' ').trim();
+  return s.length <= limit ? s : s.slice(0, limit) + ` ... [${s.length - limit} chars omitted]`;
 }
 
 // ── MCP JSON-RPC stdio transport ──────────────────────────────────────────────

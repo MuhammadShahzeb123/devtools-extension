@@ -146,6 +146,74 @@ curl -X POST http://localhost:1232/action \
 
 ---
 
+### POST /network
+
+Read the recent CDP network trace captured for a tab. The extension automatically enables the
+`Network` domain when it attaches to a tab and records a bounded in-memory log. XHR/fetch response
+bodies are captured when Chrome makes them available.
+
+**Request body**
+```json
+{
+  "tabId":  <number>,
+  "limit":  50,
+  "onlyApi": true,
+  "urlIncludes": "/api/",
+  "includeBodies": true
+}
+```
+
+All fields except `tabId` are optional. Useful filters:
+
+- `onlyApi: true` returns only XHR/fetch requests.
+- `type: "Script"` or `"XHR"` filters by CDP resource type.
+- `urlIncludes` filters by URL substring.
+- `includeBodies: false` returns metadata only.
+
+**Response**
+```json
+{
+  "result": {
+    "entries": [
+      {
+        "requestId": "1234.5",
+        "method": "GET",
+        "url": "https://example.com/api/items",
+        "type": "Fetch",
+        "status": 200,
+        "mimeType": "application/json",
+        "initiator": { "type": "script", "stack": [] },
+        "body": "{\"items\":[]}"
+      }
+    ],
+    "count": 1,
+    "total": 12
+  }
+}
+```
+
+Recommended workflow for studying frontend data loading:
+
+```bash
+node cdp-cli.js --network-clear 1
+node cdp-cli.js --do 1 navigate "{\"url\":\"https://example.com\"}"
+node cdp-cli.js --network 1 "{\"onlyApi\":true,\"limit\":25}"
+```
+
+---
+
+### POST /network/clear
+
+Clear recorded network entries before a fresh navigation or interaction.
+
+```json
+{ "tabId": 1 }
+```
+
+If `tabId` is omitted, all tab traces are cleared.
+
+---
+
 ### POST /command
 
 Execute any **raw CDP** command in a specific tab. Low-level escape hatch — prefer `/action` above.

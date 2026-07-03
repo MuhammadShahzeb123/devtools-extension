@@ -99,6 +99,21 @@ async function main() {
     if (r.error) { console.error('Error:', r.error); process.exit(1); }
     console.log(JSON.stringify(r.result, null, 2));
 
+  } else if (cmd === '--network') {
+    const [tabId, filtersArg] = args.slice(1);
+    const r = await post('/network', {
+      tabId: parseInt(tabId),
+      ...(await resolveJSON(filtersArg)),
+    });
+    if (r.error) { console.error('Error:', r.error); process.exit(1); }
+    console.log(JSON.stringify(r.result, null, 2));
+
+  } else if (cmd === '--network-clear') {
+    const [tabId] = args.slice(1);
+    const r = await post('/network/clear', { tabId: tabId == null ? undefined : parseInt(tabId) });
+    if (r.error) { console.error('Error:', r.error); process.exit(1); }
+    console.log(JSON.stringify(r.result, null, 2));
+
   } else {
     console.log('Usage:');
     console.log('  cdp-cli --tabs                              List tabs');
@@ -106,6 +121,8 @@ async function main() {
     console.log('  cdp-cli --do  <id> <action> [JSON|-|@file]  Run a palette action');
     console.log('  cdp-cli --exec <id> <method> [JSON|-|@file] Run raw CDP method');
     console.log('  cdp-cli --eval <id> <js|-|@file>            Run JS in tab');
+    console.log('  cdp-cli --network <id> [JSON|-|@file]       Show recorded network requests');
+    console.log('  cdp-cli --network-clear [id]                Clear recorded network requests');
     console.log('');
     console.log('  JSON arg formats:');
     console.log("    inline:  '{\"url\":\"https://...\"}' (simple cases only on Windows)");
