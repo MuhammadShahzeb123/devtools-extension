@@ -1,0 +1,24 @@
+{
+  "name": "cdp-bridge-mcp",
+  "version": "1.0.0",
+  "description": "MCP server that exposes Chrome browser control as tools via CDP Bridge",
+  "type": "commonjs",
+  "bin": {
+    "cdp-bridge-mcp": "mcp-server.js"
+  },
+  "scripts": {
+    "postinstall": "node install-mcp.js",
+    "mcp:install": "node install-mcp.js",
+    "mcp:uninstall": "node install-mcp.js --uninstall",
+    "start": "node mcp-server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anomalyco/devtools-extension.git"
+  },
+  "keywords": ["mcp", "chrome", "cdp", "browser", "automation"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

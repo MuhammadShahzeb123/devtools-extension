@@ -151,6 +151,20 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (method === 'POST' && url === '/cookies') {
+    let body;
+    try { body = await readBody(req); }
+    catch { reply(res, 400, { error: 'Invalid JSON body' }); return; }
+
+    try {
+      const result = await sendCommand({ type: 'getCookies', urls: body.urls });
+      reply(res, 200, { result });
+    } catch (err) {
+      reply(res, 500, { error: err.message });
+    }
+    return;
+  }
+
   if (method === 'POST' && url === '/command') {
     let body;
     try { body = await readBody(req); }

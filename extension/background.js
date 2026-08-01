@@ -78,6 +78,7 @@ async function onHostMessage(msg) {
     else if (msg.type === 'subscribe')       handleSubscribe(msg);
     else if (msg.type === 'tabs')      await handleTabs(msg);
     else if (msg.type === 'network')   await handleNetwork(msg);
+    else if (msg.type === 'getCookies')  await handleGetCookies(msg);
     else if (msg.type === 'networkClear') handleNetworkClear(msg);
   } catch (err) {
     if (msg.id) sendToHost({ id: msg.id, type: 'error', error: err.message });
@@ -126,6 +127,16 @@ function handleNetwork({ id, tabId, filters }) {
     return sendToHost({ id, type: 'error', error: 'Tab not attached' });
   }
   sendToHost({ id, type: 'result', result: getNetworkSnapshot(tabId, filters || {}) });
+}
+
+async function handleGetCookies({ id, urls }) {
+  const targets = urls && urls.length ? urls : ['https://x.com'];
+  const cookies = [];
+  for (const url of targets) {
+    const cs = await chrome.cookies.getAll({ url });
+    cookies.push(...cs);
+  }
+  sendToHost({ id, type: 'result', result: { cookies } });
 }
 
 function handleNetworkClear({ id, tabId }) {

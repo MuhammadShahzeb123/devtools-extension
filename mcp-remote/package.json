@@ -1,0 +1,19 @@
+{
+  "name": "cdp-bridge-mcp-remote",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remote MCP server bridging Claude.ai to the local CDP bridge over a WebSocket relay",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "relay": "node relay-agent.js",
+    "test": "node test-client.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "ws": "^8.21.1"
+  }
+}

@@ -4,11 +4,16 @@
   "version": "1.0.0",
   "description": "Bridge local AI tools to live Chrome via CDP",
   "permissions": [
+    "cookies",
     "debugger",
     "tabs",
     "nativeMessaging",
     "alarms",
     "storage"
+  ],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://*.x.com/*"
   ],
   "background": {
     "service_worker": "background.js"

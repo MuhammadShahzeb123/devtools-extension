@@ -8,3 +8,6 @@ host/package-lock.json
 *.jpg
 *.jpeg
 .mcp.json
+mcp-remote/node_modules/
+mcp-remote/.env
+mcp-remote/package-lock.json

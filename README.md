@@ -2,7 +2,7 @@
 
 A Chrome extension that exposes a local **HTTP API on `http://localhost:1232`** so AI agents (Claude Code, OpenCode, curl, scripts) can directly control any Chrome tab via the Chrome DevTools Protocol (CDP).
 
-> **Using OpenCode?** See **[OPENCODE.md](OPENCODE.md)** — native MCP integration, zero shell escaping, tools load automatically.
+> **Using an MCP client?** See **[OPENCODE.md](OPENCODE.md)** — run `node install-mcp.js` to auto-register with OpenCode, Claude Code, Codex, Cursor, or Synara.
 >
 > **Other AI agents:** use the **[Command Palette](PALETTE.md)**. High-level named actions (`click`, `read_text`, `find`, `scroll`, `screenshot`, …) discoverable at runtime via `GET /palette`. The raw `POST /command` is a low-level escape hatch.
 
@@ -26,7 +26,7 @@ Chrome Extension  (extension/background.js — MV3 service worker)
 Chrome Tabs  (any open tab, fully automated)
 ```
 
-**No WebSocket. No MCP server. No extra processes.** The extension connects to the host on startup and stays connected. You send HTTP requests; the host forwards them to the extension via Native Messaging; the extension executes CDP commands and returns results.
+**No WebSocket. No extra processes.** The extension connects to the host on startup and stays connected. An optional [MCP server](mcp-server.js) layer wraps the HTTP API for clients that speak the Model Context Protocol. Run `node install-mcp.js` to register it.
 
 ---
 

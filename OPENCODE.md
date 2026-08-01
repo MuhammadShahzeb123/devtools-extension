@@ -1,46 +1,96 @@
-# CDP Bridge — OpenCode Integration
+# CDP Bridge — MCP Integration
 
-Control Chrome from OpenCode using native MCP tools. No shell escaping, no CLI, no PowerShell quirks — OpenCode calls browser tools directly via structured JSON.
+Control Chrome from any MCP-compatible client (OpenCode, Claude Code, Codex, Cursor, Synara) using native MCP tools.
 
 ---
 
-## Setup (one time)
+## Quick Install
+
+```bash
+node install-mcp.js
+```
+
+This auto-detects which MCP clients are installed and registers the `cdp-bridge` MCP server for each one.
+
+**Supported clients:**
+| Client | Config file |
+|--------|------------|
+| OpenCode | `opencode.json` (project or `~/.config/opencode/`) |
+| Claude Code | `~/.claude/settings.json` |
+| Codex / Synara | `~/.synara/codex-home-overlay/config.toml` |
+| Cursor | `.cursor/mcp.json` (project or `~/.cursor/`) |
+
+To remove: `node install-mcp.js --uninstall`
+
+---
+
+## Manual Setup
 
 ### 1. Start the bridge
 
-```
+```bash
 node host/host.js
 ```
 
 The extension connects automatically. Keep this terminal open.
 
-### 2. Configure OpenCode
+### 2. Configure your MCP client
 
-Copy `opencode.json` from this repo into your project root (or merge the `mcp` block into your existing `opencode.json`):
+**OpenCode** — merge into `opencode.json`:
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "cdp-bridge": {
       "type": "local",
-      "command": "node",
-      "args": ["PATH/TO/devtools-extension/mcp-server.js"],
-      "env": {}
+      "command": ["node", "mcp-server.js"],
+      "enabled": true
     }
   }
 }
 ```
 
-> Replace `PATH/TO/devtools-extension/` with the absolute path to this repo, or use `mcp-server.js` directly if `opencode.json` is already in this folder.
+**Claude Code** — merge into `~/.claude/settings.json`:
 
-### 3. Start OpenCode
-
+```json
+{
+  "mcpServers": {
+    "cdp-bridge": {
+      "command": "node",
+      "args": ["/path/to/devtools-extension/mcp-server.js"]
+    }
+  }
+}
 ```
-opencode
+
+**Codex / Synara** — merge into `~/.synara/codex-home-overlay/config.toml`:
+
+```toml
+[mcp_servers.cdp-bridge]
+command = "node"
+args = ['C:\path\to\devtools-extension\mcp-server.js']
+
+# Per-tool approval (optional, defaults to "approve")
+[mcp_servers.cdp-bridge.tools.browser_tabs]
+approval_mode = "approve"
 ```
 
-The `cdp-bridge` MCP server starts automatically. You'll see browser tools available.
+**Cursor** — merge into `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "cdp-bridge": {
+      "command": "node",
+      "args": ["/path/to/devtools-extension/mcp-server.js"]
+    }
+  }
+}
+```
+
+### 3. Start your client
+
+The `cdp-bridge` MCP server starts automatically when your client launches. You'll see 17 browser tools available.
 
 ---
 
